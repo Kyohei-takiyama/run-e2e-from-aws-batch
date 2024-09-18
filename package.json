@@ -4,14 +4,20 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "playwright test",
-    "test:docker": "xvfb-run playwright test"
+    "build": "tsc",
+    "upload-artifacts": "ts-node src/uploadArtifacts.ts",
+    "test-and-upload": "playwright test && npm run upload-artifacts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@playwright/test": "^1.47.0",
-    "@types/node": "^22.5.4"
+    "@types/node": "^22.5.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.651.1"
   }
 }

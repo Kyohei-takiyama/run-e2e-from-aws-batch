@@ -8,3 +8,6 @@ services:
     ports:
       - "9323:9323"
     tty: true
+    environment:
+      - AWS_REGION=us-west-2
+      - E2E_ARTIFACTS_BUCKET=run-e2e-from-aws-batch-e2e-artifacts

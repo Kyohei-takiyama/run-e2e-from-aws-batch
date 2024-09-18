@@ -29,6 +29,14 @@ export default defineConfig({
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "on-first-retry",
+
+    /* 動画を撮る */
+    video: "on",
+
+    /* 操作スピードを遅くする */
+    launchOptions: {
+      slowMo: 1000, // 操作前一秒待つ
+    },
   },
 
   /* Configure projects for major browsers */
