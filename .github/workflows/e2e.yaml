@@ -19,6 +19,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      issues: write
 
     steps:
       # 2. AWS CLI のインストール
