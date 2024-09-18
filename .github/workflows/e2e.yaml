@@ -46,8 +46,7 @@ jobs:
           SUBMIT_OUTPUT=$(aws batch submit-job \
             --job-name "$JOB_NAME" \
             --job-definition "$JOB_DEFINITION" \
-            --job-queue "$JOB_QUEUE"
-
+            --job-queue "$JOB_QUEUE")
           echo "Submit Output: $SUBMIT_OUTPUT"
 
           JOB_ID=$(echo $SUBMIT_OUTPUT | jq -r '.jobId')
