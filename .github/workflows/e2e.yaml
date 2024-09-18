@@ -79,7 +79,7 @@ jobs:
       - name: Download Test Artifacts from S3
         run: |
           mkdir -p e2e-artifacts
-          aws s3 cp s3://${{ secrets.E2E_ARTIFACTS_BUCKET }}/test-results/.last-run.json e2e-artifacts/.last-run.json
+          aws s3 cp s3://${{ env.E2E_ARTIFACTS_BUCKET }}/test-results/.last-run.json e2e-artifacts/.last-run.json
 
       # 7. .last-run.json の内容をPRにコメント
       - name: Post Test Results to PR
