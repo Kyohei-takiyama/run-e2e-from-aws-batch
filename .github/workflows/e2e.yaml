@@ -109,7 +109,7 @@ jobs:
             // PRの番号を取得
             const prNumber = context.payload.pull_request.number;
 
-            // コメント内容の作成（必要に応じてフォーマットを調整）
+            // コメント内容の作成
             let commentBody = `### E2E Test Results\n`;
             if (testResults.status === "passed") {
               commentBody += `:white_check_mark: **All tests passed!**\n`;
@@ -124,25 +124,9 @@ jobs:
               });
             }
 
-            // 既存のコメントを取得（必要に応じて重複しないように処理）
-            const { data: existingComments } = await github.rest.issues.listComments({
-              ...context.repo,
-              issue_number: prNumber,
+            // PRにコメントを投稿
+            await github.rest.issues.createComment({
+            ...context.repo,
+            issue_number: prNumber,
+            body: commentBody,
             });
-
-            // 既にコメントが存在する場合は更新、存在しない場合は新規作成
-            const existingComment = existingComments.find(comment => comment.body.startsWith("### E2E Test Results"));
-
-            if (existingComment) {
-              await github.rest.issues.updateComment({
-                ...context.repo,
-                comment_id: existingComment.id,
-                body: commentBody,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                ...context.repo,
-                issue_number: prNumber,
-                body: commentBody,
-              });
-            }
