@@ -34,3 +34,18 @@ variable "ecr_repository_name" {
   description = "The name of the ECR repository."
   type        = string
 }
+
+variable "github-oidc-endpoint" {
+  description = "The OIDC endpoint for GitHub."
+  type        = string
+}
+
+variable "github_owner" {
+  description = "The owner of the GitHub repository."
+  type        = string
+}
+
+variable "github_repo" {
+  description = "The name of the GitHub repository."
+  type        = string
+}
