@@ -70,7 +70,7 @@ data "aws_iam_policy_document" "oidc-policy-document" {
       "ecr:BatchCheckLayerAvailability"
     ]
     resources = [
-      "arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/${var.ecr_repository_name}",
+      "arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/${var.ecr_repository_name}-repository",
     ]
   }
 }
