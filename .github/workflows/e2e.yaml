@@ -111,7 +111,11 @@ jobs:
 
             // コメント内容の作成（必要に応じてフォーマットを調整）
             let commentBody = `### E2E Test Results\n`;
-            commentBody += `- **Status**: ${testResults.status}\n`;
+            if (testResults.status === "passed") {
+              commentBody += `:white_check_mark: **All tests passed!**\n`;
+            } else {
+              commentBody += `:x: **Some tests failed!**\n`;
+            }
 
             if (testResults.failed_tests && testResults.failed_tests.length > 0) {
               commentBody += `\n**Failed Tests:**\n`;
