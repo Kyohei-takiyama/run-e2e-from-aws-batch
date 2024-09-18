@@ -8,6 +8,30 @@ data "aws_iam_policy_document" "oidc-policy-document" {
     resources = ["*"]
   }
 
+  # for logs
+  statement {
+    actions = [
+      "logs:PutLogEvents",
+      "logs:CreateLogStream",
+      "logs:CreateLogGroup",
+      "logs:DescribeLogGroups",
+    ]
+    resources = ["*"]
+  }
+
+  # for batch
+  statement {
+    actions = [
+      "batch:SubmitJob",
+      "batch:DescribeJobs",
+      "batch:DescribeJobDefinitions",
+      "batch:ListJobs",
+      "batch:TerminateJob"
+    ]
+    resources = ["*"]
+
+  }
+
   # for s3
   statement {
     actions = [

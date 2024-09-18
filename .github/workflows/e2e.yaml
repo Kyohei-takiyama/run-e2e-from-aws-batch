@@ -1,0 +1,142 @@
+name: E2E Tests with AWS Batch
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-west-2
+  E2E_ARTIFACTS_BUCKET: run-e2e-from-aws-batch-e2e-artifacts
+
+jobs:
+  run-e2e-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      # 2. AWS CLI のインストール
+      - name: Install AWS CLI
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+
+      # 4. ジョブのサブミット
+      - name: Submit AWS Batch Job
+        id: submit-job
+        run: |
+          JOB_NAME="e2e-test-job-${{ github.run_id }}"
+          JOB_DEFINITION="run-e2e-from-aws-batch-job-definition"
+          JOB_QUEUE="run-e2e-from-aws-batch-queue"
+
+          SUBMIT_OUTPUT=$(aws batch submit-job \
+            --job-name "$JOB_NAME" \
+            --job-definition "$JOB_DEFINITION" \
+            --job-queue "$JOB_QUEUE"
+
+          echo "Submit Output: $SUBMIT_OUTPUT"
+
+          JOB_ID=$(echo $SUBMIT_OUTPUT | jq -r '.jobId')
+          echo "job_id=$JOB_ID" >> $GITHUB_OUTPUT
+
+      # 5. ジョブのステータス確認
+      - name: Wait for AWS Batch Job to Complete
+        id: wait-job
+        run: |
+          JOB_ID=${{ steps.submit-job.outputs.job_id }}
+          echo "Waiting for job $JOB_ID to complete..."
+
+          STATUS=""
+          while true; do
+            STATUS=$(aws batch describe-jobs --jobs $JOB_ID --query 'jobs[0].status' --output text)
+            echo "Current job status: $STATUS"
+            if [[ "$STATUS" == "SUCCEEDED" ]]; then
+              echo "Job succeeded."
+              break
+            elif [[ "$STATUS" == "FAILED" ]]; then
+              echo "Job failed."
+              exit 1
+            else
+              echo "Job is still running. Waiting for 30 seconds..."
+              sleep 30
+            fi
+          done
+
+      # 6. テスト結果のダウンロード (.last-run.json のみ)
+      - name: Download Test Artifacts from S3
+        run: |
+          mkdir -p e2e-artifacts
+          aws s3 cp s3://${{ secrets.E2E_ARTIFACTS_BUCKET }}/test-results/.last-run.json e2e-artifacts/.last-run.json
+
+      # 7. .last-run.json の内容をPRにコメント
+      - name: Post Test Results to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // .last-run.json ファイルのパス
+            const jsonPath = path.join(process.cwd(), 'e2e-artifacts', '.last-run.json');
+            console.log("Reading .last-run.json from:", jsonPath);
+
+            // JSON ファイルの内容を読み込む
+            let testResults;
+            try {
+              const rawData = fs.readFileSync(jsonPath, 'utf8');
+              testResults = JSON.parse(rawData);
+            } catch (error) {
+              console.error("Error reading or parsing .last-run.json:", error);
+              throw error;
+            }
+
+            // PRの番号を取得
+            const prNumber = context.payload.pull_request.number;
+
+            // コメント内容の作成（必要に応じてフォーマットを調整）
+            let commentBody = `### E2E Test Results\n`;
+            commentBody += `- **Status**: ${testResults.status}\n`;
+
+            if (testResults.failed_tests && testResults.failed_tests.length > 0) {
+              commentBody += `\n**Failed Tests:**\n`;
+              testResults.failed_tests.forEach((test, index) => {
+                commentBody += `${index + 1}. ${test.name} - ${test.error}\n`;
+              });
+            }
+
+            // 既存のコメントを取得（必要に応じて重複しないように処理）
+            const { data: existingComments } = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: prNumber,
+            });
+
+            // 既にコメントが存在する場合は更新、存在しない場合は新規作成
+            const existingComment = existingComments.find(comment => comment.body.startsWith("### E2E Test Results"));
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: existingComment.id,
+                body: commentBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: prNumber,
+                body: commentBody,
+              });
+            }
