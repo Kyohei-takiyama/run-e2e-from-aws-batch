@@ -41,37 +41,17 @@ module "run_e2e_from_aws_batch" {
   source  = "terraform-aws-modules/batch/aws"
   version = "2.0.2"
 
-  create_instance_iam_role          = true
-  instance_iam_role_name            = "${var.prefix}-instance-role"
-  instance_iam_role_use_name_prefix = false
-  instance_iam_role_path            = "/"
-
+  # インスタンスロール作成有無
+  create_instance_iam_role = false
+  # スポットフリートロール作成有無
+  create_spot_fleet_iam_role = false
+  # サービスロール
   create_service_iam_role          = true
   service_iam_role_name            = "${var.prefix}-batch-role"
   service_iam_role_use_name_prefix = false
   service_iam_role_path            = "/"
 
-  create_spot_fleet_iam_role = false
-
-  compute_environments = {
-    run-e2e-from-aws-batch-fargate = {
-      name = "${var.prefix}-fargate"
-
-      compute_resources = {
-        type      = "FARGATE"
-        min_vcpus = 0
-        max_vcpus = 4
-
-        security_group_ids = [module.network.security_group_id]
-        subnets            = [module.network.private_subnets]
-
-        tags = {
-          Team = var.prefix
-        }
-      }
-    }
-  }
-
+  # ジョブキュー
   job_queues = {
     run-e2e-from-aws-batch-queue = {
       name                     = "${var.prefix}-queue"
@@ -85,6 +65,7 @@ module "run_e2e_from_aws_batch" {
     }
   }
 
+  # ジョブ定義
   job_definitions = {
     run-e2e-from-aws-batch = {
       name                  = "${var.prefix}-job-definition"
@@ -123,9 +104,10 @@ module "run_e2e_from_aws_batch" {
           }
         ]
 
-
-        jobRoleArn       = module.iam_role_run_e2e_from_aws_batch_job_role.iam_role_arn
+        # 実行ロール
         executionRoleArn = module.iam_role_run_e2e_from_aws_batch_execution_role.iam_role_arn
+        # ジョブロール
+        jobRoleArn = module.iam_role_run_e2e_from_aws_batch_job_role.iam_role_arn
 
         resourceRequirements = [
           { type = "VCPU", value = "1" },
@@ -136,80 +118,32 @@ module "run_e2e_from_aws_batch" {
       attempt_duration_seconds = 1801 // 60s * 30 = 30min
     }
   }
+  # コンピューティング環境
+  compute_environments = {
+    run-e2e-from-aws-batch-fargate = {
+      name = "${var.prefix}-fargate"
 
-  tags = {
-    Team = var.prefix
-  }
-}
+      compute_resources = {
+        type      = "FARGATE"
+        min_vcpus = 0
+        max_vcpus = 4
 
-# IAM Role Run E2E from AWS Batch Job Role
-module "iam_role_run_e2e_from_aws_batch_job_role" {
-  # https://registry.terraform.io/modules/terraform-aws-modules/iam/aws/latest
-  source  = "terraform-aws-modules/iam/aws//modules/iam-assumable-role"
-  version = "5.33.0"
+        security_group_ids = [module.network.security_group_id]
+        subnets            = [module.network.private_subnets]
 
-  create_role                     = true
-  role_name                       = "${var.prefix}-job-assume-role"
-  custom_role_policy_arns         = [module.iam_policy_run_e2e_from_aws_batch_job_role.arn]
-  create_custom_role_trust_policy = true
-  custom_role_trust_policy        = data.aws_iam_policy_document.iam_assume_run_e2e_from_aws_batch_job_role.json
-
-  tags = {
-    Team = var.prefix
-  }
-}
-
-data "aws_iam_policy_document" "iam_assume_run_e2e_from_aws_batch_job_role" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["ecs-tasks.amazonaws.com"]
+        tags = {
+          Team = var.prefix
+        }
+      }
     }
   }
-}
 
-module "iam_policy_run_e2e_from_aws_batch_job_role" {
-  # https://registry.terraform.io/modules/terraform-aws-modules/iam/aws/latest
-  source  = "terraform-aws-modules/iam/aws//modules/iam-policy"
-  version = "5.33.0"
-
-  name   = "${var.prefix}-job-policy"
-  policy = data.aws_iam_policy_document.iam_policy_role_run_e2e_from_aws_batch_job_role.json
-}
-
-data "aws_iam_policy_document" "iam_policy_role_run_e2e_from_aws_batch_job_role" {
-  statement {
-    effect = "Allow"
-    actions = [
-      "s3:PutObject",
-      "s3:GetObject",
-      "s3:ListBucket",
-    ]
-    resources = ["*"]
-
-  }
-  statement {
-    effect = "Allow"
-    actions = [
-      "sqs:SendMessage",
-    ]
-    resources = ["*"]
-  }
-
-  statement {
-    effect = "Allow"
-    actions = [
-      "es:ESHttpHead",
-      "es:ESHttpGet",
-      "es:ESHttpPost",
-      "es:ESHttpPut",
-    ]
-    resources = ["*"]
+  tags = {
+    Team = var.prefix
   }
 }
 
-# IAM Role ChatGPT-Analysis-Support Batch Execution
+# IAM Role Batch Execution
 module "iam_role_run_e2e_from_aws_batch_execution_role" {
   # https://registry.terraform.io/modules/terraform-aws-modules/iam/aws/latest
   source  = "terraform-aws-modules/iam/aws//modules/iam-assumable-role"
@@ -217,7 +151,7 @@ module "iam_role_run_e2e_from_aws_batch_execution_role" {
 
   create_role                     = true
   role_name                       = "${var.prefix}-execution-role"
-  custom_role_policy_arns         = [module.iam_policy_run_e2e_from_aws_batch_execution_role.arn]
+  custom_role_policy_arns         = [module.iam_policy_run_e2e_from_aws_batch_execution_role_policy.arn]
   create_custom_role_trust_policy = true
   custom_role_trust_policy        = data.aws_iam_policy_document.iam_assume_role_run_e2e_from_aws_batch_execution_role.json
 
@@ -236,15 +170,15 @@ data "aws_iam_policy_document" "iam_assume_role_run_e2e_from_aws_batch_execution
   }
 }
 
-module "iam_policy_run_e2e_from_aws_batch_execution_role" {
+module "iam_policy_run_e2e_from_aws_batch_execution_role_policy" {
   # https://registry.terraform.io/modules/terraform-aws-modules/iam/aws/latest
   source = "terraform-aws-modules/iam/aws//modules/iam-policy"
 
   name   = "${var.prefix}-execution-policy"
-  policy = data.aws_iam_policy_document.iam_policy_run_e2e_from_aws_batch_execution_role.json
+  policy = data.aws_iam_policy_document.iam_policy_run_e2e_from_aws_batch_execution_role_policy_document.json
 }
 
-data "aws_iam_policy_document" "iam_policy_run_e2e_from_aws_batch_execution_role" {
+data "aws_iam_policy_document" "iam_policy_run_e2e_from_aws_batch_execution_role_policy_document" {
   statement {
     effect = "Allow"
     actions = [
@@ -281,15 +215,58 @@ data "aws_iam_policy_document" "iam_policy_run_e2e_from_aws_batch_execution_role
     ]
     resources = ["*"]
   }
+}
 
+# IAM Role Run E2E from AWS Batch Job Role
+module "iam_role_run_e2e_from_aws_batch_job_role" {
+  # https://registry.terraform.io/modules/terraform-aws-modules/iam/aws/latest
+  source  = "terraform-aws-modules/iam/aws//modules/iam-assumable-role"
+  version = "5.33.0"
+
+  create_role                     = true
+  role_name                       = "${var.prefix}-job-role"
+  custom_role_policy_arns         = [module.iam_policy_run_e2e_from_aws_batch_job_role_policy.arn]
+  create_custom_role_trust_policy = true
+  custom_role_trust_policy        = data.aws_iam_policy_document.iam_assume_run_e2e_from_aws_batch_job_role_document.json
+
+  tags = {
+    Team = var.prefix
+  }
+}
+
+data "aws_iam_policy_document" "iam_assume_run_e2e_from_aws_batch_job_role_document" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["ecs-tasks.amazonaws.com"]
+    }
+  }
+}
+
+module "iam_policy_run_e2e_from_aws_batch_job_role_policy" {
+  # https://registry.terraform.io/modules/terraform-aws-modules/iam/aws/latest
+  source  = "terraform-aws-modules/iam/aws//modules/iam-policy"
+  version = "5.33.0"
+
+  name   = "${var.prefix}-job-policy"
+  policy = data.aws_iam_policy_document.iam_policy_role_run_e2e_from_aws_batch_job_role_policy_document.json
+}
+
+data "aws_iam_policy_document" "iam_policy_role_run_e2e_from_aws_batch_job_role_policy_document" {
   statement {
     effect = "Allow"
     actions = [
-      "ssm:GetParameters",
+      "s3:PutObject",
+      "s3:GetObject",
+      "s3:ListBucket",
     ]
     resources = ["*"]
+
   }
 }
+
+
 
 # S3 bucket for e2e artifacts
 resource "aws_s3_bucket" "e2e_artifacts" {
